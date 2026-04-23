@@ -166,7 +166,26 @@ static int write_tree_level(IndexEntry *entries, int count, ObjectID *id_out) {
                 } else {
                     break;
                 }
+            }  // Recursively build the subtree for this directory
+            ObjectID subtree_id;
+            if (build_tree_level(&entries[i], j - i, path_offset + dir_len + 1, &subtree_id) != 0) {
+                return -1;
             }
+
+            // Add the new directory tree to our current tree
+            if (tree.count >= MAX_TREE_ENTRIES) return -1;
+            
+            TreeEntry *entry = &tree.entries[tree.count++];
+            entry->mode = MODE_DIR; // 0040000
+            entry->hash = subtree_id;
+            
+            // Fix for the strncpy truncation warning: Use snprintf
+            snprintf(entry->name, sizeof(entry->name), "%s", dir_name);
+
+            i = j; // Skip past all entries handled by the recursive call
+        }
+  
+
     return 0;
 }
 int tree_from_index(ObjectID *id_out) {
