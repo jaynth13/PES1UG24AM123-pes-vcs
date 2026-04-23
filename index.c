@@ -27,7 +27,9 @@
 #include <dirent.h>
 #include <errno.h>
 
+// Forward declaration since object_write has no header
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out);
 
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
 
@@ -186,18 +188,22 @@ int index_load(Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_save(const Index *index) {
-    Index sorted = *index;
-    qsort(sorted.entries, sorted.count, sizeof(IndexEntry), compare_index_entries);
+    // Don't copy to stack - Index is too large, causes stack overflow
+    IndexEntry *sorted_entries = malloc(index->count * sizeof(IndexEntry));
+    if (index->count > 0 && !sorted_entries) return -1;
+
+    memcpy(sorted_entries, index->entries, index->count * sizeof(IndexEntry));
+    qsort(sorted_entries, index->count, sizeof(IndexEntry), compare_index_entries);
 
     char tmp_path[256];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", INDEX_FILE);
 
     FILE *f = fopen(tmp_path, "w");
-    if (!f) return -1;
+    if (!f) { free(sorted_entries); return -1; }
 
     char hex[HASH_HEX_SIZE + 1];
-    for (int i = 0; i < sorted.count; i++) {
-        IndexEntry *e = &sorted.entries[i];
+    for (int i = 0; i < index->count; i++) {
+        IndexEntry *e = &sorted_entries[i];
         hash_to_hex(&e->hash, hex);
         fprintf(f, "%06o %s %llu %u %s\n",
                 e->mode, hex,
@@ -209,6 +215,7 @@ int index_save(const Index *index) {
     fflush(f);
     fsync(fileno(f));
     fclose(f);
+    free(sorted_entries);
 
     if (rename(tmp_path, INDEX_FILE) != 0) return -1;
     return 0;
