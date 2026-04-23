@@ -15,12 +15,15 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include "index.h"
 
 // ─── Mode Constants ─────────────────────────────────────────────────────────
 
 #define MODE_FILE      0100644
 #define MODE_EXEC      0100755
 #define MODE_DIR       0040000
+
+
 
 // ─── PROVIDED ───────────────────────────────────────────────────────────────
 
@@ -127,27 +130,43 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //                       (e.g., `write_tree_level(entries, count, depth)`) to handle nested dirs.
 //   - tree_serialize  : convert your populated Tree struct into a binary buffer
 //   - object_write    : save that binary buffer to the store as OBJ_TREE
-
 //
 // Returns 0 on success, -1 on error.
-static int write_tree_level(IndexEntry *entries, int count, ObjectID *id_out) {
+// Recursive helper function to build trees at specific directory depths
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+
+// 2. The "Weak" Dummy Function (Fixes the Makefile Linker Bug)
+// Because test_tree doesn't link index.o, this placeholder satisfies the compiler 
+// for Phase 2. Once you write the real index_load in Phase 3 and build the full 
+// 'pes' binary, the C compiler will automatically ignore this weak one!
+__attribute__((weak)) int index_load(Index *index) {
+    if (index) index->count = 0;
+    return 0;
+}
+
+// Recursive helper function to build trees at specific directory depths
+static int build_tree_level(IndexEntry *entries, int count, int path_offset, ObjectID *out_id) {
     Tree tree;
     tree.count = 0;
 
     int i = 0;
     while (i < count) {
-        char *slash = strchr(entries[i].path, '/');
+        const char *subpath = entries[i].path + path_offset;
+        char *slash = strchr(subpath, '/');
 
-        if (slash == NULL) {
-            TreeEntry *te = &tree.entries[tree.count++];
-            te->mode = entries[i].mode;
-            strncpy(te->name, entries[i].path, sizeof(te->name) - 1);
-            te->name[sizeof(te->name) - 1] = '\0';
-            te->hash = entries[i].hash;
+        if (!slash) {
+            // BASE CASE: It's a file in the current directory level
+            if (tree.count >= MAX_TREE_ENTRIES) return -1;
+            
+            TreeEntry *entry = &tree.entries[tree.count++];
+            entry->mode = entries[i].mode;
+            entry->hash = entries[i].hash; 
+            
+            // Fix for the strncpy truncation warning: Use snprintf
+            snprintf(entry->name, sizeof(entry->name), "%s", subpath);
+            
             i++;
-        }
-    }
-    else {
+        } else {
             // RECURSIVE CASE: It's a subdirectory
             int dir_len = slash - subpath;
             char dir_name[256];
@@ -166,7 +185,9 @@ static int write_tree_level(IndexEntry *entries, int count, ObjectID *id_out) {
                 } else {
                     break;
                 }
-            }  // Recursively build the subtree for this directory
+            }
+
+            // Recursively build the subtree for this directory
             ObjectID subtree_id;
             if (build_tree_level(&entries[i], j - i, path_offset + dir_len + 1, &subtree_id) != 0) {
                 return -1;
@@ -184,7 +205,10 @@ static int write_tree_level(IndexEntry *entries, int count, ObjectID *id_out) {
 
             i = j; // Skip past all entries handled by the recursive call
         }
-      void *tree_data = NULL;
+    }
+
+    // Serialize the populated Tree struct into binary
+    void *tree_data = NULL;
     size_t tree_len = 0;
     if (tree_serialize(&tree, &tree_data, &tree_len) != 0) {
         return -1;
