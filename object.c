@@ -113,6 +113,9 @@ if (object_exists(&id)) {
     free(full_data);
     return 0;
 }
+
+free(full_data);
+return 0;
 }
 
 // Read an object from the store.
