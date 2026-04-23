@@ -147,6 +147,26 @@ static int write_tree_level(IndexEntry *entries, int count, ObjectID *id_out) {
             i++;
         }
     }
+    else {
+            // RECURSIVE CASE: It's a subdirectory
+            int dir_len = slash - subpath;
+            char dir_name[256];
+            
+            if (dir_len >= (int)sizeof(dir_name)) return -1;
+            
+            // Fix for the strncpy truncation warning: Use snprintf
+            snprintf(dir_name, dir_len + 1, "%s", subpath);
+
+            // Find all contiguous entries that belong in this subdirectory
+            int j = i;
+            while (j < count) {
+                const char *j_subpath = entries[j].path + path_offset;
+                if (strncmp(j_subpath, dir_name, dir_len) == 0 && j_subpath[dir_len] == '/') {
+                    j++;
+                } else {
+                    break;
+                }
+            }
     return 0;
 }
 int tree_from_index(ObjectID *id_out) {
