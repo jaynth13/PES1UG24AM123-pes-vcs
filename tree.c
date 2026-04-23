@@ -184,9 +184,17 @@ static int write_tree_level(IndexEntry *entries, int count, ObjectID *id_out) {
 
             i = j; // Skip past all entries handled by the recursive call
         }
-  
+      void *tree_data = NULL;
+    size_t tree_len = 0;
+    if (tree_serialize(&tree, &tree_data, &tree_len) != 0) {
+        return -1;
+    }
 
-    return 0;
+    // Write the raw binary to the object store
+    int write_res = object_write(OBJ_TREE, tree_data, tree_len, out_id);
+    
+    free(tree_data);
+    return write_res;
 }
 int tree_from_index(ObjectID *id_out) {
     // TODO: Implement recursive tree building
