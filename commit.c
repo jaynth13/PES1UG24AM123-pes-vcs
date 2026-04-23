@@ -196,4 +196,9 @@ int head_update(const ObjectID *new_commit) {
 int commit_create(const char *message, ObjectID *commit_id_out) {
     Commit commit;
     memset(&commit, 0, sizeof(Commit));
+     // 1. Build the tree from the index
+    if (tree_from_index(&commit.tree) != 0) {
+        fprintf(stderr, "error: nothing to commit (is the index empty?)\n");
+        return -1;
+    }
 }
