@@ -157,9 +157,28 @@ int object_read(const char *hex, char *type, void **data, size_t *size) {
     char *buffer = malloc(file_size);
     fread(buffer, 1, file_size, f);
     fclose(f);
+    ObjectID check_id;
+    compute_hash(buffer, file_size, &check_id);
 
-    *data = buffer;
-    *size = file_size;
+    if (memcmp(&id, &check_id, sizeof(ObjectID)) != 0) {
+        free(buffer);
+        return -1;
+    }
 
+    
+    char *data_start = memchr(buffer, '\0', file_size);
+    if (!data_start) {
+        free(buffer);
+        return -1;
+    }
+
+    sscanf(buffer, "%s %zu", type, size);
+
+    data_start++; 
+
+    *data = malloc(*size);
+    memcpy(*data, data_start, *size);
+
+    free(buffer);
     return 0;
 }
