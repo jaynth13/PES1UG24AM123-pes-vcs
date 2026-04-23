@@ -201,4 +201,7 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
         fprintf(stderr, "error: nothing to commit (is the index empty?)\n");
         return -1;
     }
+     if (head_read(&commit.parent) != 0) {
+        // First commit: memset already zeroed out commit.parent
+    }
 }
