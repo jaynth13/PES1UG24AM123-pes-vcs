@@ -196,30 +196,53 @@ int head_update(const ObjectID *new_commit) {
 int commit_create(const char *message, ObjectID *commit_id_out) {
     Commit commit;
     memset(&commit, 0, sizeof(Commit));
-     // 1. Build the tree from the index
+
+    // 1. Build the tree from the index
     if (tree_from_index(&commit.tree) != 0) {
         fprintf(stderr, "error: nothing to commit (is the index empty?)\n");
         return -1;
     }
-     if (head_read(&commit.parent) != 0) {
+
+    // 2. Set the parent commit (if HEAD exists)
+    if (head_read(&commit.parent) != 0) {
         // First commit: memset already zeroed out commit.parent
     }
-      strncpy(commit.author, pes_author(), sizeof(commit.author) - 1);
+
+    // 3. Set metadata
+    strncpy(commit.author, pes_author(), sizeof(commit.author) - 1);
     commit.timestamp = (uint64_t)time(NULL);
     strncpy(commit.message, message, sizeof(commit.message) - 1);
 
-    / 4. Serialize
+    // 4. Serialize
     void *buffer = NULL;
     size_t len = 0;
     if (commit_serialize(&commit, &buffer, &len) != 0) {
         return -1;
     }
-    / 5. Write the commit object
+
+    // 5. Write the commit object
     ObjectID commit_id;
     if (object_write(OBJ_COMMIT, buffer, len, &commit_id) != 0) {
         free(buffer);
         return -1;
     }
     free(buffer);
+
+    // 6. Update HEAD
+    if (head_update(&commit_id) != 0) {
+        return -1;
+    }
+
+    // 7. Output the ID to the caller (fixes the warning)
+    if (commit_id_out) {
+        *commit_id_out = commit_id;
+    }
+
+    // Print for user feedback
+    char hex[HASH_HEX_SIZE + 1];
+    hash_to_hex(&commit_id, hex);
+    printf("[%s] %s\n", hex, message);
+
+    return 0;
 
 }
