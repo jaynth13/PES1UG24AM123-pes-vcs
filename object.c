@@ -106,6 +106,13 @@ memcpy(full_data + header_len, data, size);
 ObjectID id;
 compute_hash(full_data, total_size, &id);
 hash_to_hex(&id, out_hash);
+char path[512];
+object_path(&id, path, sizeof(path));
+
+if (object_exists(&id)) {
+    free(full_data);
+    return 0;
+}
 }
 
 // Read an object from the store.
