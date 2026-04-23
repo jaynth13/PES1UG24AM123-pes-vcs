@@ -103,6 +103,9 @@ char *full_data = malloc(total_size);
 
 memcpy(full_data, header, header_len);
 memcpy(full_data + header_len, data, size);
+ObjectID id;
+compute_hash(full_data, total_size, &id);
+hash_to_hex(&id, out_hash);
 }
 
 // Read an object from the store.
