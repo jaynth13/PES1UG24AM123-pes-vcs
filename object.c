@@ -140,8 +140,26 @@ return 0;
 //
 // The caller is responsible for calling free(*data_out).
 // Returns 0 on success, -1 on error (file not found, corrupt, etc.).
-int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out) {
-    // TODO: Implement
-    (void)id; (void)type_out; (void)data_out; (void)len_out;
-    return -1;
+int object_read(const char *hex, char *type, void **data, size_t *size) {
+    ObjectID id;
+    hex_to_hash(hex, &id);
+
+    char path[512];
+    object_path(&id, path, sizeof(path));
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+
+    fseek(f, 0, SEEK_END);
+    size_t file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char *buffer = malloc(file_size);
+    fread(buffer, 1, file_size, f);
+    fclose(f);
+
+    *data = buffer;
+    *size = file_size;
+
+    return 0;
 }
