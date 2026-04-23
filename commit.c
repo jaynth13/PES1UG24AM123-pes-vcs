@@ -204,4 +204,8 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
      if (head_read(&commit.parent) != 0) {
         // First commit: memset already zeroed out commit.parent
     }
+      strncpy(commit.author, pes_author(), sizeof(commit.author) - 1);
+    commit.timestamp = (uint64_t)time(NULL);
+    strncpy(commit.message, message, sizeof(commit.message) - 1);
+
 }
